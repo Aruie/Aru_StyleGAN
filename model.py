@@ -11,16 +11,18 @@ NOISE_PROB = [0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1, 0.1]
 EPSILON = 1e-8
 Z_SIZE = 100
 MAPPING_UINT = 512
-BATCH_SIZE = 2
 
 
 
 # 생성기 정의
 class Generator(nn.Module) :
-    def __init__(self, block_count = 9) :
+    def __init__(self, batch_size, block_count = 9) :
         super(Generator, self).__init__()
+        self.mapping = MappingNet()
         self.block = {}
-        self.to_RGB= {}
+        self.to_RGB = {}
+
+        self.base = torch.randn(batch_size, CHANNELS[1], PIXELS[1], PIXELS[1])
 
         for i in range(block_count) :
 
@@ -28,10 +30,11 @@ class Generator(nn.Module) :
             self.to_RGB[i+1] = ToRGB(i+1)
 
 
-    def forward(self, w, step):
 
+    def forward(self, z, step):
 
-        x = torch.randn(BATCH_SIZE, PIXELS[1], PIXELS[1], CHANNELS[1])
+        x = self.base
+        w = self.mapping(z)
 
         for i in range(step) :
             x = self.block[i+1](x, w, NOISE_PROB[i+1])
@@ -52,7 +55,7 @@ class GBlock(nn.Module) :
         self.prev_channel = CHANNELS[self.step - 1]
         self.channel = CHANNELS[self.step]
 
-        # 0블록에선 con1은 작동하지 않음
+        # 1블록에선 con1은 작동하지 않음
         self.conv0 = nn.Conv2d(self.prev_channel, self.channel, 3, padding = 1)
         self.conv1 = nn.Conv2d(self.channel, self.channel, 3, padding = 1)
 
@@ -68,9 +71,7 @@ class GBlock(nn.Module) :
 
     def forward(self, x, w, noise_prob) :
 
-        if self.step == 1 :
-            x = torch.randn(BATCH_SIZE, self.prev_channel, self.pixel, self.pixel)
-        else:
+        if self.step != 1 :
             x = self.upsample(x)
             x = self.conv0(x)
 
@@ -181,18 +182,11 @@ class DBlock(nn.Module):
             ################################
             # minibatch standard deviation
             ################################
-            x = x.view(BATCH_SIZE, -1)
+            x = x.view(x.shape[0], -1)
             x = self.fc(x)
 
         return x
             
-
-
-class Loss(nn.Module) :
-    def __init__(self) :
-        None
-    def forward(self, x, y) :
-        None
 
 # Latent space 정의 
 class MappingNet(nn.Module) :
@@ -216,24 +210,17 @@ class MappingNet(nn.Module) :
 
 
 if __name__ == "__main__" :
-    a = MappingNet()
-    w = a(torch.rand(100))
+    z = torch.rand(100)
  
-    g = Generator()
+    g = Generator(2)
     d = Discriminator()
 
     step = 9
 
-    y = g(w, step)
+    y = g(z, step)
     print(y.shape)
 
-    
     z = d(y, step)
     print(z.shape)
-    print(z)
-    
-    Loss()
-
-
 
 
