@@ -3,7 +3,8 @@ from torch import nn
 from torch.nn import functional as F
 
 
-# 사용 채널들 리스트
+# 사용 채널들 리스트 
+# 추후 제거 고민중 굳이 파이썬에서도 제거할 필요가 있을까
 # list        0   1   2   3   4   5   6   7   8    9       
 CHANNELS = [512,512,512,512,512,256,128, 64, 32,  16]
 PIXELS =   [  0,  4,  8, 16, 32, 64,128,256,512,1024]
@@ -19,16 +20,15 @@ class Generator(nn.Module) :
     def __init__(self, batch_size, block_count = 9) :
         super(Generator, self).__init__()
         self.mapping = MappingNet()
-        self.block = {}
-        self.to_RGB = {}
+        self.block = nn.ModuleDict()
+        self.to_RGB = nn.ModuleDict()
 
         self.base = torch.randn(batch_size, CHANNELS[1], PIXELS[1], PIXELS[1])
 
         for i in range(block_count) :
 
-            self.block[i+1] = GBlock(i+1)
-            self.to_RGB[i+1] = ToRGB(i+1)
-
+            self.block[str(i+1)] = GBlock(i+1)
+            self.to_RGB[str(i+1)] = ToRGB(i+1)
 
 
     def forward(self, z, step):
@@ -37,9 +37,9 @@ class Generator(nn.Module) :
         w = self.mapping(z)
 
         for i in range(step) :
-            x = self.block[i+1](x, w, NOISE_PROB[i+1])
+            x = self.block[str(i+1)](x, w, NOISE_PROB[i+1])
 
-        x = self.to_RGB[i+1](x)
+        x = self.to_RGB[str(i+1)](x)
 
 
         return x
@@ -129,19 +129,19 @@ class FromRGB(nn.Module) :
 class Discriminator(nn.Module) :
     def __init__(self, block_count = 9) :
         super(Discriminator, self).__init__()
-        self.block = {}
-        self.from_RGB= {}
+        self.block = nn.ModuleDict()
+        self.from_RGB = nn.ModuleDict()
 
         for i in range(block_count, 0, -1) :
-            self.from_RGB[i] = FromRGB(i)
-            self.block[i] = DBlock(i)
+            self.from_RGB[str(i)] = FromRGB(i)
+            self.block[str(i)] = DBlock(i)
 
 
     def forward(self, x, step) :
-        x = self.from_RGB[step](x)
+        x = self.from_RGB[str(step)](x)
 
         for i in range(step, 0, -1) :
-            x = self.block[i](x)
+            x = self.block[str(i)](x)
 
         return x
 
@@ -193,7 +193,7 @@ class MappingNet(nn.Module) :
     def __init__(self) :
         super(MappingNet, self).__init__()
 
-        self.dense = [(nn.Linear(Z_SIZE, MAPPING_UINT))]
+        self.dense = nn.ModuleList([nn.Linear(Z_SIZE, MAPPING_UINT)])
 
         for i in range(7) :
             self.dense.append(nn.Linear(MAPPING_UINT, MAPPING_UINT))
@@ -215,7 +215,7 @@ if __name__ == "__main__" :
     g = Generator(2)
     d = Discriminator()
 
-    step = 9
+    step = 3
 
     y = g(z, step)
     print(y.shape)

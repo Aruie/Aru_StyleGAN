@@ -4,14 +4,14 @@ import PIL.Image as Image
 import numpy as np
 
 class TrainDataset(data.Dataset) :
-    def __init__(self, step, root) :
-        self.root = root
-        self.samples = os.listdir(self.root)
+    def __init__(self, step, path) :
+        self.path = path
+        self.samples = os.listdir(self.path)
         self.step = step
 
     def __getitem__(self, index) :
         
-        sample = os.path.join(self.root, self.samples[index])
+        sample = os.path.join(self.path, self.samples[index])
         image = Image.open(sample)
 
         width = 2 ** (self.step + 1)
@@ -25,8 +25,8 @@ class TrainDataset(data.Dataset) :
 
 
 
-def data_loader(step, batch_size, root, num_workers = 0) :
-    dataset = TrainDataset(step, root)
+def data_loader(step, batch_size, path, num_workers = 0) :
+    dataset = TrainDataset(step, path)
 
     loader = data.DataLoader(dataset = dataset,
                              batch_size = batch_size,
