@@ -3,6 +3,7 @@ from torch.utils import data
 import PIL.Image as Image
 import numpy as np
 
+# 학습 데이터셋 정의
 class TrainDataset(data.Dataset) :
     def __init__(self, step, path) :
         self.path = path
@@ -14,6 +15,7 @@ class TrainDataset(data.Dataset) :
         sample = os.path.join(self.path, self.samples[index])
         image = Image.open(sample)
 
+        # step별 resize
         width = 2 ** (self.step + 1)
         image = image.resize((width, width))
         image_array = np.array(image, dtype=np.float32).transpose(2,0,1) / 255.

@@ -117,7 +117,9 @@ def main(num_block) :
           batch_size, epochs, path_image)
     print(f'Train End')
 
-    # 임시 생성
+
+    ###############################33
+    # 임시 생성 테스트용
     z = torch.rand(100)
     image = generator(z, num_block).detach().numpy()[0]
     image = image.transpose((1,2,0))
