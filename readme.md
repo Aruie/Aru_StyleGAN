@@ -1,4 +1,4 @@
-# A Style-Based Generator Architecture for Generative Adversarial Network
+# (작업중) A Style-Based Generator Architecture for Generative Adversarial Network
 
 Nvidia에서 나온 논문인데 너무 감동받았다.
 내가 GAN에 뛰어들게 만든 장본인... 꼭한번 구현해보고 싶었는데
@@ -8,22 +8,25 @@ Nvidia에서 나온 논문인데 너무 감동받았다.
 참고자료는  
 SRGAN [https://arxiv.org/abs/1812.04948]   
 PGGAN [https://arxiv.org/abs/1710.10196](PGGAN)  
-그리고 아래 깃허브 참조  
+
+그리고 자세히 안나온 부분은 아래 깃허브 참조  
 https://github.com/SiskonEmilia/StyleGAN-PyTorch/
 
 
 
 # 진행중 및 추가필요작업
  - 모델 아키텍쳐
-   - 아 학습을 조금이라도 해봐야 문제를찾는데.. GCP가 말썽을...
+   - 현재 임시로 첫배치만 실행하고 넘어가게 해둠 (cpu로 하는 테스팅의 한계로...)
    - cuda 넣어주기 및 병렬화 기능 추가
    - Save 및 Load 구현
    - Smooth Resolution Change ( 해보고 비교할랬는데...)
-   - Noise의 위치 수정 (학습하면서)
+   - Noise의 위치 수정 (학습하면서...)
    - Latent Space 2중화 (이것도 하면서..)
+
  - 기타 
     - Main.py Parser 구현 (이건 다되고 나중에해도 굳이...)
     - 전체 관리 Singleton 클래스 구현
+    - tqmd 적용
 
  - 그리고 학습하기.... 
     - 집에서 학습할 모델이 아닌지라...
