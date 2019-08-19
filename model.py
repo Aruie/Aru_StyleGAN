@@ -23,7 +23,7 @@ class Generator(nn.Module) :
         self.block = nn.ModuleDict()
         self.to_RGB = nn.ModuleDict()
 
-        self.base = torch.randn(batch_size, CHANNELS[1], PIXELS[1], PIXELS[1])
+        self.base = nn.Parameter(torch.randn(batch_size, CHANNELS[1], PIXELS[1], PIXELS[1]))
 
         for i in range(block_count) :
 
@@ -73,6 +73,10 @@ class GBlock(nn.Module) :
         self.style1 = nn.Linear(MAPPING_UINT, layer_size)
         self.style2 = nn.Linear(MAPPING_UINT, layer_size)
 
+        # noise 미리지정 
+        self.noise1 = nn.Parameter(torch.randn(self.noise_shape))
+        self.noise2 = nn.Parameter(torch.randn(self.noise_shape))
+
         # 그냥 업샘플
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
 
@@ -87,7 +91,7 @@ class GBlock(nn.Module) :
         ################
         # 노이즈 추가 - 추후 방식 변경
         ################
-        noise = torch.randn(self.noise_shape)
+        noise = self.noise1
         x = x + noise * noise_prob
 
         # 피쳐당 노말라이즈 실행, 배치당이 아님
@@ -103,7 +107,7 @@ class GBlock(nn.Module) :
         # 위 과정 반복, 모듈화 시킬까 고민중
         x = self.conv1(x)
 
-        noise = torch.randn(self.noise_shape)
+        noise = self.noise2
         x = x + noise * noise_prob
 
         x = x - torch.mean(x, dim=(2,3), keepdim=True)
@@ -224,17 +228,20 @@ class MappingNet(nn.Module) :
 
 # 테스트
 if __name__ == "__main__" :
-    z = torch.rand(100)
+    z = torch.rand(100).cuda()
  
     g = Generator(2)
+    g = g.cuda()
     d = Discriminator()
-
+    d = d.cuda()
     step = 3
+
 
     y = g(z, step)
     print(y.shape)
 
     z = d(y, step)
     print(z.shape)
+
 
 

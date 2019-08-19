@@ -110,7 +110,12 @@ def main(num_block) :
 
     # 원하는 갯수의 블록을 가진 Generator 와 Discriminator 생성
     generator = model.Generator(batch_size, num_block)
+ 
     discriminator = model.Discriminator(num_block)
+
+    if torch.cuda.is_available() == True : 
+        generator = generator.cuda()
+        discriminator = discriminator.cuda()
 
     # 학습 시작
     train(num_block, generator, discriminator,
@@ -129,7 +134,7 @@ def main(num_block) :
     
 # 테스트용
 if __name__ == "__main__" :
-    main(6)
+    main(2)
 
     
     print('End of main')
