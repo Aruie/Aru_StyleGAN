@@ -30,16 +30,13 @@ def train(num_block, generator, discriminator,
     # Progressive 학습 실행, 8x8 부터
     for step in range(2, num_block + 1) :
 
-        # 에폭별실행, 추후 step별 에폭 조정 기능 추가
+        # 에폭별실행
+        for epoch in range(1, epochs + 1) :
 
-
-        for epoch in range(epochs) :
-
-
+            #데이터 로더 생성 (에포크당 최대 샘플 1000개)
             loader = data_loader(step, batch_size, path=path_image, num_workers=0)
-            
 
-
+            #생성된 로더로 이터레이션 실행
             for batch, real_image in enumerate(loader) :
 
                 print(f'step = {step}, epoch = {epoch}, batch = {batch}')
@@ -114,9 +111,10 @@ def main(num_block) :
     # 환경변수 지정, 추후 parser로 변환 예정
     #####################################
     num_block = num_block
-    epochs = 10
-    batch_size = 7
-    path_image = os.path.join(os.getcwd(), 'train_image/')
+    epochs = 5
+    batch_size = 64
+    #path_image = os.path.join(os.getcwd(), 'train_image/')
+    path_image = os.path.join(os.getcwd(), '../datasets/DogData/')
     path_model = os.path.join(os.getcwd(), 'save_model/')
     print(f' Path of Image : {path_image}')
 
@@ -153,7 +151,7 @@ def main(num_block) :
     
 # 테스트용
 if __name__ == "__main__" :
-    main(5)
+    main(4)
 
     
     print('End of main')

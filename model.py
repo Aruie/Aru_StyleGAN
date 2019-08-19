@@ -31,24 +31,35 @@ class Generator(nn.Module) :
             self.to_RGB[str(i+1)] = ToRGB(i+1)
 
 
-    def forward(self, z, step):
+    def forward(self, z, step, alpha=0):
 
         x = self.base
         w = self.mapping(z)
 
+
         # 스텝 수만큼 레이어 반복
-        for i in range(step) :
-            x = self.block[str(i+1)](x, w, NOISE_PROB[i+1])
+        for i in range(1, step+1) :
+            x = self.block[str(i)](x, w, NOISE_PROB[i+1])
 
-        #######################
-        # 스무스한 변화를 위한 알파 적용 구현 필요
-        #######################
-
-        # 3채널로 변경
         x = self.to_RGB[str(i+1)](x)
+        
+        # 3채널로 변경
+        return x    
 
+        #######################
+        # 스무스한 변화를 위한 알파 적용 구현 필요    - 보류
+        #######################
 
-        return x
+        #for i in range(1, step) :
+        #    x = self.block[str(i)](x, w, NOISE_PROB[i+1])
+        #ori = nn.Upsample(scale_factor=2, mode='bilinear')(x)
+        #new = self.block[str(step)](x, w, NOISE_PROB[i+1])
+
+        #ori = self.to_RGB[str(step)](ori) * alpha
+        #new = self.to_RGB[str(step)](new) * (1-alpha)
+        #x = ori + new
+
+        
         
             
 # 생성기 내부 반복블럭 정의, step별 생성가능
@@ -186,6 +197,9 @@ class DBlock(nn.Module):
             self.conv2 = nn.Conv2d(self.channel, self.channel, 4, padding=0)
             self.leaky2 = nn.LeakyReLU(0.2)
             self.fc = nn.Linear(self.next_channel, 1)
+
+        self.stddev = MinibatchStandardDeviation(4)
+
         
     def forward(self, x) :
         
@@ -198,14 +212,38 @@ class DBlock(nn.Module):
             x = self.avgpool(x)
 
         else :
+
+            
             ################################
             # minibatch standard deviation 구현해야됨
             ################################
+            
+
+            x = self.stddev(x)
+
+
             x = x.view(x.shape[0], -1)
             x = self.fc(x)
 
         return x
-            
+
+class MinibatchStandardDeviation(nn.Module) :
+    def __init__(self, group_size = 4) :
+        super(MinibatchStandardDeviation, self).__init__()
+        self.group_size = group_size
+
+    def forward(self, x) :
+        s = x.shape
+        group_size = torch.min(self.group_size, 4)
+        y = x.view(group_size, -1, s[1], s[2], s[3])
+        y = y - y.mean(dim=0, keepdim=True)
+        y = (y**2).mean(dim=0)
+        y = torch.sqrt(y + EPSILON)
+        y = y.mean(dim=(1,2,3), keepdim=True)
+
+        x = torch.cat((x,y), dim=0)
+        return x
+
 
 # Latent space 맵핑 네트워크 z > w
 class MappingNet(nn.Module) :
@@ -234,7 +272,7 @@ if __name__ == "__main__" :
     g = g.cuda()
     d = Discriminator()
     d = d.cuda()
-    step = 5
+    step = 3
 
 
     y = g(z, step)

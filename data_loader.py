@@ -30,15 +30,22 @@ class TrainDataset(data.Dataset) :
 def data_loader(step, batch_size, path, num_workers = 0) :
     dataset = TrainDataset(step, path)
 
+
+
+    ############# 수정
+    if len(dataset) > 5 :
+        sampler = data.RandomSampler(dataset, replacement = True, num_samples = 1000)
+    else :
+        sampler = data.RandomSampler(dataset)
+
     loader = data.DataLoader(dataset = dataset,
-                             batch_size = batch_size,
-                             shuffle = True,
-                             num_workers = num_workers)
+                            batch_size = batch_size,
+                            num_workers = num_workers,
+                            sampler = sampler)
+
     return loader
 
-
-
 if __name__ == "__main__" :
-    a = data_loader(1, 4, './train_image')
-    b = next(iter(a))
-    print(b.shape)
+    a = data_loader(1, 3, './train_image')
+    for i, b in enumerate(a) :
+        print(b.shape)
