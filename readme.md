@@ -5,6 +5,9 @@ Nvidia에서 나온 논문인데 너무 감동받았다.
 마침 스터디도 하게 되었겠다 바로 시작!
 
 
+은 이사떄문에 일주일동안 건들지도 못했다 ㅠㅠ
+이틀안에 마무리해보자
+
 참고자료는  
 SRGAN [https://arxiv.org/abs/1812.04948]   
 PGGAN [https://arxiv.org/abs/1710.10196](PGGAN)  
@@ -16,8 +19,8 @@ https://github.com/SiskonEmilia/StyleGAN-PyTorch/
 
 # 진행중 및 추가필요작업
  - 모델 아키텍쳐
-   - 현재 임시로 첫배치만 실행하고 넘어가게 해둠 (cpu로 하는 테스팅의 한계로...)
-   - cuda 넣어주기 및 병렬화 기능 추가
+   - ~~현재 임시로 첫배치만 실행하고 넘어가게 해둠 (cpu로 하는 테스팅의 한계로...)~~
+   - ~~cuda 넣어주기 및 병렬화 기능 추가~~
    - Save 및 Load 구현
    - Smooth Resolution Change ( 해보고 비교할랬는데...)
    - Noise의 위치 수정 (학습하면서...)

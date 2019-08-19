@@ -234,7 +234,7 @@ if __name__ == "__main__" :
     g = g.cuda()
     d = Discriminator()
     d = d.cuda()
-    step = 3
+    step = 5
 
 
     y = g(z, step)
