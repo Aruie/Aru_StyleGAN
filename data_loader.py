@@ -47,7 +47,7 @@ def data_loader(step, batch_size, path, num_workers = 0) :
     dataset = TrainDataset(step, path)
 
     # 비복원 추출로 1000개 제한
-    sampler = MaxSampler(dataset, 1000)
+    sampler = MaxSampler(dataset, 100)
     loader = data.DataLoader(dataset = dataset,
                             batch_size = batch_size,
                             num_workers = num_workers,

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 import model
 from data_loader import data_loader
+from tqdm import tqdm
 
 
 def set_requires_grad(module, flag) :
@@ -26,27 +27,29 @@ def train(num_block, generator, discriminator,
     for step in range(2, num_block + 1) :
 
         # 에폭별실행
-        for epoch in range(1, epochs + 1) :
+        #for epoch in tqdm(range(1, epochs[step] + 1)):
+        for epoch in range(1, epochs[step] + 1):
 
             #데이터 로더 생성 (에포크당 최대 샘플 1000개)
-            loader = data_loader(step, batch_size, path=path_image, num_workers=0)
+            loader = data_loader(step, batch_size, path=path_image, num_workers=1)
+
+            
+            print(f'step = {step}, epoch = {epoch}')
+
 
             #생성된 로더로 이터레이션 실행
-            for batch, real_image in enumerate(loader) :
-
-                print(f'step = {step}, epoch = {epoch}, batch = {batch}')
+            for real_image in loader :
 
                 # 가우시안 분포로 z 생성
-                z = torch.rand(100)
-
+                z = [torch.rand(100), torch.rand(100)]
+                #z.append()
+                #z.append(torch.rand(100))
+                
                 if torch.cuda.is_available() :
                     real_image = real_image.cuda()
-                    z = z.cuda()
-            
-            # 데이터로더 생성 및 데이터 가져오기
-            # 로더를 에폭마다 생성하는데 step마다 생성하는것으로 변경 예정
-            #loader = iter(data_loader(i, batch_size, path=path_image, num_workers=0 ))
-            #real_image = data
+                    z[0] = z[0].cuda()
+                    z[1] = z[1].cuda()
+ 
             
                 # Discriminator 학습
                 discriminator.zero_grad()            
@@ -65,8 +68,9 @@ def train(num_block, generator, discriminator,
                 grad_penalty = 10 / 2 * grad_penalty
                 grad_penalty.backward()
 
+
                 # Loss 계산
-                fake_image = generator(z, step)
+                fake_image = generator(z[0], step)
                 fake_predict = discriminator(fake_image, step)
                 
                 fake_predict = F.softplus(fake_predict).mean()
@@ -86,7 +90,7 @@ def train(num_block, generator, discriminator,
                 set_requires_grad(discriminator, False)
                 set_requires_grad(generator, True)
 
-                fake_image = generator(z, step)
+                fake_image = generator(z[0], step)
                 fake_predict = discriminator(fake_image, step)
                 fake_predict = F.softplus(-fake_predict).mean()
                 fake_predict.backward()
@@ -112,7 +116,7 @@ def load_model(file_model) :
 
 
 # 메인함수
-def main(num_block, epochs, batch_size, is_train, is_continue, is_save) :
+def main(num_block, epochs_list, batch_size, is_train, is_continue, is_save) :
 
     #####################################
     # 환경변수 지정, 추후 parser로 변환 예정
@@ -149,7 +153,7 @@ def main(num_block, epochs, batch_size, is_train, is_continue, is_save) :
     # 학습 시작
     if is_train :
         train(num_block, generator, discriminator,
-                 batch_size, epochs, path_image)
+                 batch_size, epochs_list, path_image)
         print(f'Train End')
 
     if is_save :
@@ -158,26 +162,29 @@ def main(num_block, epochs, batch_size, is_train, is_continue, is_save) :
         file_model = os.path.join(path_model, model_name)
         save_model(file_model, generator, discriminator)
 
-    ###############################33
-    # 임시 생성 테스트용
-    z = torch.rand(100)
-    if torch.cuda.is_available() :
-        z = z.cuda()
+    for i in range(5) :
+        ###############################33
+        # 임시 생성 테스트용
+        z = torch.rand(100)
+        if torch.cuda.is_available() :
+            z = z.cuda()
 
-    image = generator(z, num_block).cpu().detach().numpy()[0]
-    image = image.transpose((1,2,0))
-    img = Image.fromarray(np.uint8(image*255))
-    img.save(os.path.join('save_image/','save.png'), format='png')
+        image = generator(z, num_block).cpu().detach().numpy()[0]
+        image = image.transpose((1,2,0))
+        img = Image.fromarray(np.uint8(image*255))
+        img.save(os.path.join('save_image/',f'save{i}.png'), format='png')
+
+    
     
     
 # 테스트용
 if __name__ == "__main__" :
 
     num_block = 5
-    epochs = 50
-    batch_size = 32
+    epochs_list = [-1, -1, 50, 50, 50, 50, 50, 0, 0, 0, 0]
+    batch_size = 4
 
-    main(num_block, epochs, batch_size, 
+    main(num_block, epochs_list, batch_size, 
         is_train = True, is_continue = False, is_save = True)
     
     print('End of main')

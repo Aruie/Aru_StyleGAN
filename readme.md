@@ -30,7 +30,7 @@ https://github.com/SiskonEmilia/StyleGAN-PyTorch/
  - 기타 
     - Main.py Parser 구현 (이건 다되고 나중에해도 굳이...)
     - 전체 관리 Singleton 클래스 구현
-    - tqmd 적용
+    - ~~tqmd 적용~~ 원격에 잦은 오류 발생으로 패스
 
  - 그리고 학습하기.... 
     - 역시나 잘안된다 ㅠ 많은 에폭을 돌려보자

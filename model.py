@@ -36,7 +36,6 @@ class Generator(nn.Module) :
         x = self.base
         w = self.mapping(z)
 
-
         # 스텝 수만큼 레이어 반복
         for i in range(1, step+1) :
             x = self.block[str(i)](x, w, NOISE_PROB[i])
