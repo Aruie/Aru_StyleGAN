@@ -25,10 +25,10 @@ class Generator(nn.Module) :
 
         self.base = nn.Parameter(torch.randn(batch_size, CHANNELS[1], PIXELS[1], PIXELS[1]))
 
-        for i in range(block_count) :
+        for i in range(1, block_count+1) :
 
-            self.block[str(i+1)] = GBlock(i+1)
-            self.to_RGB[str(i+1)] = ToRGB(i+1)
+            self.block[str(i)] = GBlock(i)
+            self.to_RGB[str(i)] = ToRGB(i)
 
 
     def forward(self, z, step, alpha=0):
@@ -39,9 +39,9 @@ class Generator(nn.Module) :
 
         # 스텝 수만큼 레이어 반복
         for i in range(1, step+1) :
-            x = self.block[str(i)](x, w, NOISE_PROB[i+1])
+            x = self.block[str(i)](x, w, NOISE_PROB[i])
 
-        x = self.to_RGB[str(i+1)](x)
+        x = self.to_RGB[str(i)](x)
         
         # 3채널로 변경
         return x    
@@ -91,6 +91,11 @@ class GBlock(nn.Module) :
         # 그냥 업샘플
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
 
+        # 리키렐루
+        self.leaky1 = nn.LeakyReLU(0.2)
+        self.leaky2 = nn.LeakyReLU(0.2)
+          
+
 
     def forward(self, x, w, noise_prob) :
 
@@ -98,6 +103,7 @@ class GBlock(nn.Module) :
         if self.step != 1 :
             x = self.upsample(x)
             x = self.conv0(x)
+            x = self.leaky1(x)
 
         ################
         # 노이즈 추가 - 추후 방식 변경
@@ -117,6 +123,7 @@ class GBlock(nn.Module) :
 
         # 위 과정 반복, 모듈화 시킬까 고민중
         x = self.conv1(x)
+        x = self.leaky2(x)
 
         noise = self.noise2
         x = x + noise * noise_prob
@@ -185,24 +192,31 @@ class DBlock(nn.Module):
         self.channel = CHANNELS[self.step]
         self.next_channel = CHANNELS[self.step - 1]
 
-        self.conv1 = nn.Conv2d(self.channel, self.channel, 3, padding=1)
         self.leaky1 = nn.LeakyReLU(0.2)
+        self.leaky2 = nn.LeakyReLU(0.2)
+            
+
+        self.stddev = MinibatchStandardDeviation()
+
 
         if self.step != 1 :
+            self.conv1 = nn.Conv2d(self.channel, self.channel, 3, padding=1)
             self.conv2 = nn.Conv2d(self.channel, self.next_channel, 3, padding=1) 
-            self.leaky2 = nn.LeakyReLU(0.2)
             self.avgpool = nn.AvgPool2d(2)
 
         else :
+            self.conv1 = nn.Conv2d(self.channel+1, self.channel, 3, padding=1)
             self.conv2 = nn.Conv2d(self.channel, self.channel, 4, padding=0)
-            self.leaky2 = nn.LeakyReLU(0.2)
             self.fc = nn.Linear(self.next_channel, 1)
 
-        self.stddev = MinibatchStandardDeviation(4)
-
+        
         
     def forward(self, x) :
-        
+
+        if self.step == 1 :
+            # minibatch standard deviation 구현
+            x = self.stddev(x)
+
         x = self.conv1(x)
         x = self.leaky1(x)
         x = self.conv2(x)
@@ -213,14 +227,7 @@ class DBlock(nn.Module):
 
         else :
 
-            
-            ################################
-            # minibatch standard deviation 구현해야됨
-            ################################
-            
-
-            x = self.stddev(x)
-
+       
 
             x = x.view(x.shape[0], -1)
             x = self.fc(x)
@@ -228,20 +235,17 @@ class DBlock(nn.Module):
         return x
 
 class MinibatchStandardDeviation(nn.Module) :
-    def __init__(self, group_size = 4) :
+    def __init__(self) :
         super(MinibatchStandardDeviation, self).__init__()
-        self.group_size = group_size
 
     def forward(self, x) :
         s = x.shape
-        group_size = torch.min(self.group_size, 4)
-        y = x.view(group_size, -1, s[1], s[2], s[3])
-        y = y - y.mean(dim=0, keepdim=True)
-        y = (y**2).mean(dim=0)
+        y = x - x.mean(dim=0, keepdim=True)
+        y = (y**2).mean(0)
         y = torch.sqrt(y + EPSILON)
-        y = y.mean(dim=(1,2,3), keepdim=True)
-
-        x = torch.cat((x,y), dim=0)
+        y = y.mean()
+        y = y.expand((s[0],1,s[2],s[3]))
+        x = torch.cat([x, y], 1)
         return x
 
 
@@ -268,11 +272,11 @@ class MappingNet(nn.Module) :
 if __name__ == "__main__" :
     z = torch.rand(100).cuda()
  
-    g = Generator(2)
+    g = Generator(9)
     g = g.cuda()
-    d = Discriminator()
+    d = Discriminator(9)
     d = d.cuda()
-    step = 3
+    step = 6
 
 
     y = g(z, step)

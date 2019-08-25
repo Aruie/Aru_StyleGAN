@@ -19,9 +19,10 @@ https://github.com/SiskonEmilia/StyleGAN-PyTorch/
 
 # 진행중 및 추가필요작업
  - 모델 아키텍쳐
-   - ~~현재 임시로 첫배치만 실행하고 넘어가게 해둠 (cpu로 하는 테스팅의 한계로...)~~
-   - ~~cuda 넣어주기 및 병렬화 기능 추가~~
-   - Save 및 Load 구현
+   - ~~GPU 기능 추가~~
+   - ~~학습 샘플수 1000개 제한(학습속도 일정화, 더 많은 샘플을 쓰고싶으면 에폭을 늘리자)~~
+   - ~~Save 및 Load 구현~~
+   - ~~Minibatch stddev 구현~~
    - Smooth Resolution Change ( 해보고 비교할랬는데...)
    - Noise의 위치 수정 (학습하면서...)
    - Latent Space 2중화 (이것도 하면서..)
@@ -32,8 +33,7 @@ https://github.com/SiskonEmilia/StyleGAN-PyTorch/
     - tqmd 적용
 
  - 그리고 학습하기.... 
-    - 집에서 학습할 모델이 아닌지라...
-    - GCP 언제쯤 되려나 ㅠㅠ
+    - 역시나 잘안된다 ㅠ 많은 에폭을 돌려보자
 
 
 

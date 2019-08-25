@@ -1,5 +1,6 @@
 import os
 from torch.utils import data
+import torch
 import PIL.Image as Image
 import numpy as np
 
@@ -25,27 +26,38 @@ class TrainDataset(data.Dataset) :
     def __len__(self) :
         return len(self.samples)
 
+# 샘플이 n개 이하일땐 그냥 셔플, n개 이상일땐 셔플 후 1000개 sampling
+class MaxSampler(data.Sampler) :
+    def __init__(self, data_source, max_sample) :
+        self.data_source = data_source
+        
+        if len(self.data_source ) < max_sample :
+            self.num_samples = len(self.data_source)
+        else :
+            self.num_samples = max_sample
+
+    def __iter__(self) :
+        return iter(torch.randperm(self.num_samples).tolist())
+
+    def __len__(self) :
+        return self.num_samples
 
 
 def data_loader(step, batch_size, path, num_workers = 0) :
     dataset = TrainDataset(step, path)
 
-
-
-    ############# 수정
-    if len(dataset) > 5 :
-        sampler = data.RandomSampler(dataset, replacement = True, num_samples = 1000)
-    else :
-        sampler = data.RandomSampler(dataset)
-
+    # 비복원 추출로 1000개 제한
+    sampler = MaxSampler(dataset, 1000)
     loader = data.DataLoader(dataset = dataset,
                             batch_size = batch_size,
                             num_workers = num_workers,
                             sampler = sampler)
-
     return loader
 
 if __name__ == "__main__" :
-    a = data_loader(1, 3, './train_image')
+    a = data_loader(1, 128, '../datasets/DogData/')
+    #a = data_loader(1, 3, './train_image')
+    len(a)
+
     for i, b in enumerate(a) :
         print(b.shape)

@@ -11,8 +11,6 @@ import model
 from data_loader import data_loader
 
 
-
-
 def set_requires_grad(module, flag) :
     for p in module.parameters() :
         p.requires_grad = flag
@@ -21,11 +19,8 @@ def set_requires_grad(module, flag) :
 def train(num_block, generator, discriminator, 
           batch_size, epochs, path_image) :
 
-
     d_losses = []
     g_losses = []
-
-
 
     # Progressive 학습 실행, 8x8 부터
     for step in range(2, num_block + 1) :
@@ -104,19 +99,31 @@ def train(num_block, generator, discriminator,
 
     return d_losses, g_losses
 
+def save_model(file_model, generator, discriminator ) :
+    torch.save({
+        'generator' : generator.state_dict(),
+        'discriminator' : discriminator.state_dict()
+        }, file_model)
+
+def load_model(file_model) :
+    model_dict = torch.load(file_model)
+    return model_dict
+
+
+
 # 메인함수
-def main(num_block) :
+def main(num_block, epochs, batch_size, is_train, is_continue, is_save) :
 
     #####################################
     # 환경변수 지정, 추후 parser로 변환 예정
     #####################################
-    num_block = num_block
-    epochs = 5
-    batch_size = 64
+    
     #path_image = os.path.join(os.getcwd(), 'train_image/')
     path_image = os.path.join(os.getcwd(), '../datasets/DogData/')
     path_model = os.path.join(os.getcwd(), 'save_model/')
     print(f' Path of Image : {path_image}')
+
+    model_name = 'model.pth'
 
     # 블록이 하나 이하일시 종료
     if(num_block <= 1) :
@@ -130,12 +137,26 @@ def main(num_block) :
     if torch.cuda.is_available() == True : 
         generator = generator.cuda()
         discriminator = discriminator.cuda()
+    
+    if is_continue :  
+        file_model = os.path.join(path_model, model_name)
 
+        if os.path.exists(file_model) :  
+            model_dict = load_model(file_model)
+            generator.load_state_dict(model_dict['generator'])
+            discriminator.load_state_dict(model_dict['discriminator'])
+    
     # 학습 시작
-    train(num_block, generator, discriminator,
-          batch_size, epochs, path_image)
-    print(f'Train End')
+    if is_train :
+        train(num_block, generator, discriminator,
+                 batch_size, epochs, path_image)
+        print(f'Train End')
 
+    if is_save :
+        if os.path.exists(path_model) == False :
+            os.mkdir(path_model)
+        file_model = os.path.join(path_model, model_name)
+        save_model(file_model, generator, discriminator)
 
     ###############################33
     # 임시 생성 테스트용
@@ -146,13 +167,18 @@ def main(num_block) :
     image = generator(z, num_block).cpu().detach().numpy()[0]
     image = image.transpose((1,2,0))
     img = Image.fromarray(np.uint8(image*255))
-    img.save('save.png', format='png')
+    img.save(os.path.join('save_image/','save.png'), format='png')
     
     
 # 테스트용
 if __name__ == "__main__" :
-    main(4)
 
+    num_block = 5
+    epochs = 50
+    batch_size = 32
+
+    main(num_block, epochs, batch_size, 
+        is_train = True, is_continue = False, is_save = True)
     
     print('End of main')
 
