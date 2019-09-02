@@ -1,12 +1,13 @@
-# (작업중) A Style-Based Generator Architecture for Generative Adversarial Network
+(Multiple GPU 문제 해결시까지 보류) 
+
+# A Style-Based Generator Architecture for Generative Adversarial Network
 
 Nvidia에서 나온 논문인데 너무 감동받았다.
 내가 GAN에 뛰어들게 만든 장본인... 꼭한번 구현해보고 싶었는데
 마침 스터디도 하게 되었겠다 바로 시작!
 
-
-은 이사떄문에 일주일동안 건들지도 못했다 ㅠㅠ
-이틀안에 마무리해보자
+본격적으로 구현을 시작한 최초의 모델인데
+왜 학습이 힘든걸 골랐을까 엄청 후회중....
 
 참고자료는  
 SRGAN [https://arxiv.org/abs/1812.04948]   
