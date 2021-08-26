@@ -58,17 +58,16 @@ class Generator(nn.Module) :
         super(Generator, self).__init__()
 
         # Sub Module Create 
-        self.mapping = MappingNet()
+        # self.mapping = MappingNet()
         self.block = nn.ModuleDict()
         self.to_RGB = nn.ModuleDict()
 
         # Const Initialize (4 x 4)
-        self.const = nn.Parameter(torch.ones(1, CHANNELS[1], PIXELS[1], PIXELS[1])
-                                , requires_grad = False)
+        self.const = torch.ones(1, CHANNELS[1], PIXELS[1], PIXELS[1])
+                     
 
         # Layers
         for i in range(1, block_count+1) :
-
             # Style Block
             self.block[str(i)] = GBlock(i)
 
@@ -76,7 +75,7 @@ class Generator(nn.Module) :
             self.to_RGB[str(i)] = ToRGB(i)
 
 
-    def forward(self, w, noise, step, alpha=1):
+    def forward(self, w, step, noise = None, alpha=1):
         ###########################################
         # w : Embedded Latent Vector 
         #     shape = ( b, MAPPING_UNITS )
@@ -93,27 +92,28 @@ class Generator(nn.Module) :
 
         # Get Batch Size
         b, _ = w.shape
-
-        # Mapping Network
-        w = self.mapping(z)
-
+        
         # Const Vector Start
-        x = self.const.expand(b)
+        x = self.const.expand(b, CHANNELS[1], 4, 4)
 
         # Main Generator
         for i in range(1, step+1) :
 
             if (i == step) and (i != 1) :
-                ux = F.upsample(x, mode='bilinear')
+                ux = F.interpolate(x, scale_factor=2)
+                # ux = F.upsample(x, scale_factor= 2, mode='bilinear')
 
-            x = self.block[str(i)](x, w, noise[i] * NOISE_PROB[i])
+            # if noise is None :
+            noise = torch.randn(1, 1, PIXELS[i], PIXELS[i])
+
+            x = self.block[str(i)]( x, w, noise )
 
         # To RGB with Smoothing
         if step == 1 :
             y = self.to_RGB[str(i)](x)
             
         else : 
-            ux = self.to_RGB[str(i)](ux)
+            ux = self.to_RGB[str(i-1)](ux)
             x = self.to_RGB[str(i)](x)
             y = ux * (1 - alpha) + (x * alpha)
 
@@ -133,21 +133,21 @@ class GBlock(nn.Module) :
         self.pixel = PIXELS[self.step]
         self.prev_channel = CHANNELS[self.step - 1]
         self.channel = CHANNELS[self.step]
-        self.noise_prob = NOISE_PROB[self.step]
+        # self.noise_prob = NOISE_PROB[self.step]
 
         # Main Convolution layer
         self.conv0 = nn.Conv2d(self.prev_channel, self.channel, 3, padding = 1)
         self.conv1 = nn.Conv2d(self.channel, self.channel, 3, padding = 1)
 
         # Layer Shape 
-        self.layer_shape = [2, 1, self.channel, 1, 1]
+        self.layer_shape = [2, -1, self.channel, 1, 1]
         self.noise_shape = [1, self.channel, self.pixel, self.pixel]
 
         # Style Mapping ( mu + sigma ) 
         self.style = nn.Linear(MAPPING_UNITS, 2 * self.channel)
 
         # Noise Factor Per Channel
-        self.noise_factor = nn.parameter( torch.zeros(1, self.channel, 1, 1 ) )
+        self.noise_factor = nn.Parameter( torch.zeros(1, self.channel, 1, 1 ) )
 
         # Upsample
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
@@ -166,7 +166,7 @@ class GBlock(nn.Module) :
         x = self.conv0(x)
 
         # Add Noise
-        x = x + noise * self.noise_factor * self.noise_prob
+        x = x + noise * self.noise_factor #* self.noise_prob
         x = self.act(x)
 
         # Adaptive Instance Normalization
@@ -181,7 +181,7 @@ class GBlock(nn.Module) :
         # Repeat 
         x = self.conv1(x)
 
-        x = x + noise * self.noise_factor * self.noise_prob
+        x = x + noise * self.noise_factor #* self.noise_prob
         x = self.act(x)
 
         x = x - torch.mean(x, dim=(2,3), keepdim=True)
@@ -305,16 +305,18 @@ class MinibatchStandardDeviation(nn.Module) :
 
 # 테스트
 if __name__ == "__main__" :
-    z = torch.rand(100).cuda()
- 
-    g = Generator(9)
-    g = g.cuda()
-    d = Discriminator(9)
-    d = d.cuda()
+    z = torch.randn(1, 512)
+    print(z.shape)
     step = 6
 
+    m = MappingNet()
+    g = Generator(step)
+    d = Discriminator(step)
 
-    y = g(z, step)
+    w = m(z)
+    print(w.shape)
+
+    y = g(w, step)
     print(y.shape)
 
     z = d(y, step)
