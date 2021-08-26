@@ -2,3 +2,6 @@
 __pycache__/
 save_image/
 save_model/
+artifacts/
+wandb/
+data_path.conf

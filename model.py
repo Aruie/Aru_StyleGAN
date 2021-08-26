@@ -307,7 +307,7 @@ class MinibatchStandardDeviation(nn.Module) :
 if __name__ == "__main__" :
     z = torch.randn(1, 512)
     print(z.shape)
-    step = 6
+    step = 5
 
     m = MappingNet()
     g = Generator(step)
