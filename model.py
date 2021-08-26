@@ -3,140 +3,198 @@ from torch import nn
 from torch.nn import functional as F
 
 
-# 사용 채널들 리스트 
-# 추후 제거 고민중 굳이 파이썬에서도 제거할 필요가 있을까
+ 
+# Channels Per Layer
 # list        0   1   2   3   4   5   6   7   8    9       
 CHANNELS = [512,512,512,512,512,256,128, 64, 32,  16]
+
+# Pixels Per Layer
 PIXELS =   [  0,  4,  8, 16, 32, 64,128,256,512,1024]
+
+# Noise Ratio Per Layer
 NOISE_PROB = [0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1, 0.1]
+
 EPSILON = 1e-8
-Z_SIZE = 100
-MAPPING_UINT = 512
+
+# Latent Size
+Z_SIZE = 512
+
+# Mapping Network Units
+MAPPING_UNITS = 512
 
 
 
-# 생성기 정의
+
+# Mapping Network
+class MappingNet(nn.Module) :
+    def __init__(self) :
+        super(MappingNet, self).__init__()
+
+        # FCL List
+        self.dense = nn.ModuleList([nn.Linear(Z_SIZE, MAPPING_UNITS)])
+        self.act = nn.LeakyReLU(negative_slope=0.2)
+
+        for i in range(7) :
+            self.dense.append(nn.Linear(MAPPING_UNITS, MAPPING_UNITS))
+
+    def forward(self, x) :
+        
+        for i in range(0,4) :
+            rc = x
+            x = self.dense[ i*2 ](x)
+            x = self.act(x)
+            x = self.dense[ i*2 +1 ](x)
+            x = rc + x
+            x = self.act(x)
+
+        return x
+
+
+
+
+# Define Generator
 class Generator(nn.Module) :
-    def __init__(self, batch_size, block_count = 9) :
+    def __init__(self, block_count = 9) :
         super(Generator, self).__init__()
+
+        # Sub Module Create 
         self.mapping = MappingNet()
         self.block = nn.ModuleDict()
         self.to_RGB = nn.ModuleDict()
 
-        self.base = nn.Parameter(torch.randn(batch_size, CHANNELS[1], PIXELS[1], PIXELS[1]))
+        # Const Initialize (4 x 4)
+        self.const = nn.Parameter(torch.ones(1, CHANNELS[1], PIXELS[1], PIXELS[1])
+                                , requires_grad = False)
 
+        # Layers
         for i in range(1, block_count+1) :
 
+            # Style Block
             self.block[str(i)] = GBlock(i)
+
+            # To RGB Convert Layer
             self.to_RGB[str(i)] = ToRGB(i)
 
 
-    def forward(self, z, step, alpha=0):
+    def forward(self, w, noise, step, alpha=1):
+        ###########################################
+        # w : Embedded Latent Vector 
+        #     shape = ( b, MAPPING_UNITS )
+        #   
+        # step : Progressive Step 
+        #
+        # noise : Noise List 
+        #     shape = layers * ( h * w )
+        # 
+        # alpha : Smoothing Parameter ( init 0 to 1 )
+        #         0 : Upsample Result
+        #         1 : StyleBlock Result 
+        ###########################################
 
-        x = self.base
+        # Get Batch Size
+        b, _ = w.shape
+
+        # Mapping Network
         w = self.mapping(z)
 
-        # 스텝 수만큼 레이어 반복
+        # Const Vector Start
+        x = self.const.expand(b)
+
+        # Main Generator
         for i in range(1, step+1) :
-            x = self.block[str(i)](x, w, NOISE_PROB[i])
 
-        x = self.to_RGB[str(i)](x)
-        
-        # 3채널로 변경
-        return x    
+            if (i == step) and (i != 1) :
+                ux = F.upsample(x, mode='bilinear')
 
-        #######################
-        # 스무스한 변화를 위한 알파 적용 구현 필요    - 보류
-        #######################
+            x = self.block[str(i)](x, w, noise[i] * NOISE_PROB[i])
 
-        #for i in range(1, step) :
-        #    x = self.block[str(i)](x, w, NOISE_PROB[i+1])
-        #ori = nn.Upsample(scale_factor=2, mode='bilinear')(x)
-        #new = self.block[str(step)](x, w, NOISE_PROB[i+1])
-
-        #ori = self.to_RGB[str(step)](ori) * alpha
-        #new = self.to_RGB[str(step)](new) * (1-alpha)
-        #x = ori + new
-
-        
-        
+        # To RGB with Smoothing
+        if step == 1 :
+            y = self.to_RGB[str(i)](x)
             
-# 생성기 내부 반복블럭 정의, step별 생성가능
+        else : 
+            ux = self.to_RGB[str(i)](ux)
+            x = self.to_RGB[str(i)](x)
+            y = ux * (1 - alpha) + (x * alpha)
+
+        return y
+
+        
+                    
+# Define Style Block 
 class GBlock(nn.Module) :
     def __init__(self, step) :
         super(GBlock, self).__init__()
 
+        # Current Step
         self.step = step
+
+        # Pixel, Channel of Current Layer
         self.pixel = PIXELS[self.step]
         self.prev_channel = CHANNELS[self.step - 1]
         self.channel = CHANNELS[self.step]
+        self.noise_prob = NOISE_PROB[self.step]
 
+        # Main Convolution layer
         self.conv0 = nn.Conv2d(self.prev_channel, self.channel, 3, padding = 1)
         self.conv1 = nn.Conv2d(self.channel, self.channel, 3, padding = 1)
 
-        # 현재 스텝에서 사용할 레이어의 크기 미리 저장, 계산 최소화
-        self.layer_shape = [-1, 2, self.channel, 1, 1]
+        # Layer Shape 
+        self.layer_shape = [2, 1, self.channel, 1, 1]
         self.noise_shape = [1, self.channel, self.pixel, self.pixel]
 
-        # StyleMixing을 위해 W 에서 a, b 로 맵핑
-        layer_size = 2 * self.channel
-        self.style1 = nn.Linear(MAPPING_UINT, layer_size)
-        self.style2 = nn.Linear(MAPPING_UINT, layer_size)
+        # Style Mapping ( mu + sigma ) 
+        self.style = nn.Linear(MAPPING_UNITS, 2 * self.channel)
 
-        # noise 미리지정 
-        self.noise1 = nn.Parameter(torch.randn(self.noise_shape))
-        self.noise2 = nn.Parameter(torch.randn(self.noise_shape))
+        # Noise Factor Per Channel
+        self.noise_factor = nn.parameter( torch.zeros(1, self.channel, 1, 1 ) )
 
-        # 그냥 업샘플
+        # Upsample
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
 
-        # 리키렐루
-        self.leaky1 = nn.LeakyReLU(0.2)
-        self.leaky2 = nn.LeakyReLU(0.2)
+        # Activation
+        self.act = nn.LeakyReLU(0.2)
           
 
 
-    def forward(self, x, w, noise_prob) :
+    def forward(self, x, w, noise) :
 
-        # 업샘플 및 컨볼류션, 첫블록에서는 사용하지않음
+        # Not Using Upsample Layer in First Block
         if self.step != 1 :
             x = self.upsample(x)
-            x = self.conv0(x)
-            x = self.leaky1(x)
+        
+        x = self.conv0(x)
 
-        ################
-        # 노이즈 추가 - 추후 방식 변경
-        ################
-        noise = self.noise1
-        x = x + noise * noise_prob
+        # Add Noise
+        x = x + noise * self.noise_factor * self.noise_prob
+        x = self.act(x)
 
-        # 피쳐당 노말라이즈 실행, 배치당이 아님
+        # Adaptive Instance Normalization
         x = x - torch.mean(x, dim=(2,3), keepdim=True)
         p = torch.rsqrt(torch.mean(x**2, dim=(2,3), keepdim=True) + EPSILON) 
         x = torch.mul(p,x)
-
-        # 생성된 스타일로 ax + b Pixelwise 연산
-        style = self.style1(w)
+        
+        style = self.style(w)
         style = style.view(self.layer_shape)
-        x = x * style[:,0] + style[:,1]
+        x = x * style[0] + style[1]
 
-        # 위 과정 반복, 모듈화 시킬까 고민중
+        # Repeat 
         x = self.conv1(x)
-        x = self.leaky2(x)
 
-        noise = self.noise2
-        x = x + noise * noise_prob
+        x = x + noise * self.noise_factor * self.noise_prob
+        x = self.act(x)
 
         x = x - torch.mean(x, dim=(2,3), keepdim=True)
         p = torch.rsqrt(torch.mean(x**2, dim=(2,3), keepdim=True) + EPSILON) 
         x = torch.mul(p,x)
 
-        style = self.style2(w)
+        style = self.style(w)
+        style = style.view(self.layer_shape)
         x = x * style[0] + style[1]
 
         return x
 
-# 다채널 데이터를 3채널로 변경
+# ToRGB
 class ToRGB(nn.Module) :
     def __init__(self, step) :
         super(ToRGB, self).__init__()
@@ -145,7 +203,7 @@ class ToRGB(nn.Module) :
     def forward(self, x):
         return self.conv(x)
 
-# 3채널 데이터를 레이어에 필요한 채널수로 변경
+# FromRGB
 class FromRGB(nn.Module) :
     def __init__(self, step) :
         super(FromRGB, self).__init__()
@@ -154,7 +212,8 @@ class FromRGB(nn.Module) :
     def forward(self, x) :
         return self.conv(x)
          
-# Discriminator 정의
+
+# Define Discriminator 
 class Discriminator(nn.Module) :
     def __init__(self, block_count = 9) :
         super(Discriminator, self).__init__()
@@ -162,20 +221,16 @@ class Discriminator(nn.Module) :
         self.from_RGB = nn.ModuleDict()
 
         for i in range(block_count, 0, -1) :
-            self.from_RGB[str(i)] = FromRGB(i)
             self.block[str(i)] = DBlock(i)
+            self.from_RGB[str(i)] = FromRGB(i)
+            
 
 
     def forward(self, x, step) :
-
-        #######################
-        # 스무스한 변화를 위한 알파 적용 구현 필요
-        #######################
-
-        # 다채널 데이터로 변경, 전체 스텝에서 1회만 필요
+        # From RGB, Using First Block Only
         x = self.from_RGB[str(step)](x)
 
-        # 블록 반복 실행
+        # Main Block
         for i in range(step, 0, -1) :
             x = self.block[str(i)](x)
 
@@ -191,12 +246,8 @@ class DBlock(nn.Module):
         self.channel = CHANNELS[self.step]
         self.next_channel = CHANNELS[self.step - 1]
 
-        self.leaky1 = nn.LeakyReLU(0.2)
-        self.leaky2 = nn.LeakyReLU(0.2)
-            
-
+        self.act = nn.LeakyReLU(0.2)
         self.stddev = MinibatchStandardDeviation()
-
 
         if self.step != 1 :
             self.conv1 = nn.Conv2d(self.channel, self.channel, 3, padding=1)
@@ -212,60 +263,45 @@ class DBlock(nn.Module):
         
     def forward(self, x) :
 
+        # MiniBatch Standard Deviation
         if self.step == 1 :
-            # minibatch standard deviation 구현
             x = self.stddev(x)
 
         x = self.conv1(x)
-        x = self.leaky1(x)
+        x = self.act(x)
         x = self.conv2(x)
-        x = self.leaky2(x)
+        x = self.act(x)
 
         if self.step != 1 :
             x = self.avgpool(x)
-
         else :
-
-       
-
             x = x.view(x.shape[0], -1)
             x = self.fc(x)
 
         return x
+
 
 class MinibatchStandardDeviation(nn.Module) :
     def __init__(self) :
         super(MinibatchStandardDeviation, self).__init__()
 
     def forward(self, x) :
-        s = x.shape
-        y = x - x.mean(dim=0, keepdim=True)
+        b, c, h, w = x.shape
+
+        # Calculate STD
+        y = x - x.mean(dim = 0, keepdim = True)
         y = (y**2).mean(0)
         y = torch.sqrt(y + EPSILON)
+
+        # Average To Single Value
         y = y.mean()
-        y = y.expand((s[0],1,s[2],s[3]))
+        
+        # Expand and Concat Channel
+        y = y.expand((b, 1, h, w))
         x = torch.cat([x, y], 1)
         return x
 
 
-# Latent space 맵핑 네트워크 z > w
-class MappingNet(nn.Module) :
-    def __init__(self) :
-        super(MappingNet, self).__init__()
-
-        self.dense = nn.ModuleList([nn.Linear(Z_SIZE, MAPPING_UINT)])
-
-        for i in range(7) :
-            self.dense.append(nn.Linear(MAPPING_UINT, MAPPING_UINT))
-
-    def forward(self, x) :
-        # 추후 조절을 위해 입력을 따로 받음
-        # 입력은 (100,1) 의 Unifrom-Dist 벡터
-        for i in range(8) :
-            x = self.dense[i](x)
-            x = nn.ReLU()(x)
-
-        return x
 
 # 테스트
 if __name__ == "__main__" :
