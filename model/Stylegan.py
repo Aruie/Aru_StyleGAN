@@ -281,6 +281,7 @@ class DBlock(nn.Module):
         return x
 
 
+
 class MinibatchStandardDeviation(nn.Module) :
     def __init__(self) :
         super(MinibatchStandardDeviation, self).__init__()
@@ -300,6 +301,7 @@ class MinibatchStandardDeviation(nn.Module) :
         y = y.expand((b, 1, h, w))
         x = torch.cat([x, y], 1)
         return x
+
 
 
 
